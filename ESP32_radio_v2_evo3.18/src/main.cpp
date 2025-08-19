@@ -23,6 +23,9 @@
 #include <ESPmDNS.h>           // Blibioteka mDNS dla ESP
 
 #include "u8g2_wqy.h"          // 中文字库-文泉驿
+#include "IndexHtml.h"  
+#include "sdCard.h"
+
 
 // Deklaracja wersji oprogramowania i nazwy hosta widocznego w routerze oraz na ekranie OLED i stronie www
 #define softwareRev "v3.18.13"  // Wersja oprogramowania radia
@@ -302,906 +305,20 @@ Ticker timer2;             // Timer do getWeatherData co 60s
 //Ticker timer3;           // Timer do przełączania wyświetlania danych pogodoych w ostatniej linii co 10s
 WiFiClient client;         // Obiekt do obsługi połączenia WiFi dla klienta HTTP
 
-const char stylehead_html[] PROGMEM = R"rawliteral(
-  <!DOCTYPE HTML><html>
-  <head>
-    <link rel='icon' href='/favicon.ico' type='image/x-icon'>
-    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
-    <link rel="apple-touch-icon" sizes="180x180" href="/icon.png">
-    <link rel="icon" type="image/png" sizes="192x192" href="/icon.png">
-
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Evo Web Radio</title>
-    <style>
-      html {font-family: Arial; display: inline-block; text-align: center;}
-      h2 {font-size: 1.3rem;}
-      p {font-size: 0.95rem;}
-      table {border: 1px solid black; border-collapse: collapse; margin: 0px 0px;}
-      td, th {font-size: 0.8rem; border: 1px solid gray; border-collapse: collapse;}
-      td:hover {font-weight:bold;}
-      a {color: black; text-decoration: none;}
-      body {max-width: 1380px; margin:0px auto; padding-bottom: 25px; background: #D0D0D0;}
-      .slider {-webkit-appearance: none; margin: 14px; width: 330px; height: 10px; background: #4CAF50; outline: none; -webkit-transition: .2s; transition: opacity .2s; border-radius: 5px;}
-      .slider::-webkit-slider-thumb {-webkit-appearance: none; appearance: none; width: 35px; height: 25px; background: #4a4a4a; cursor: pointer; border-radius: 5px;}
-      .slider::-moz-range-thumb { width: 35px; height: 35px; background: #4a4a4a; cursor: pointer; border-radius: 5px;} 
-      .button { background-color: #4CAF50; border: 1; color: white; padding: 10px 20px; border-radius: 5px;}
-      .buttonBank { background-color: #4CAF50; border: 1; color: white; padding: 8px 8px; border-radius: 5px; width: 35px; height: 35px; margin: 0 1.5px;}
-      .buttonBankSelected { background-color: #505050; border: 1; color: white; padding: 8px 8px; border-radius: 5px; width: 35px; height: 35px; margin: 0 1.5px;}
-      .buttonBank:active {background-color: #4a4a4a box-shadow: 0 4px #666; transform: translateY(2px);}
-      .buttonBank:hover {background-color: #4a4a4a;}
-      .button:hover {background-color: #4a4a4a;}
-      .button:active {background-color: #4a4a4a; box-shadow: 0 4px #666; transform: translateY(2px);}
-      .column { align: center; padding: 5px; display: flex; justify-content: space-between;}
-      .columnlist { align: center; padding: 10px; display: flex; justify-content: center;}
-      .stationList {text-align:left; margin-top: 0px; width: 280px; margin-bottom:0px;cursor: pointer;}
-      .stationNumberList {text-align:center; margin-top: 0px; width: 35px; margin-bottom:0px;}
-      .stationListSelected {text-align:left; margin-top: 0px; width: 280px; margin-bottom:0px;cursor: pointer; background-color: #4CAF50;}
-      .stationNumberListSelected {text-align:center; margin-top: 0px; width: 35px; margin-bottom:0px; background-color: #4CAF50;}
-      .station-name   
-    </style>
-  </head>
-)rawliteral";
-
-
-const char index_html[] PROGMEM = R"rawliteral(
-  <!DOCTYPE HTML><html>
-  <head>
-    <link rel='icon' href='/favicon.ico' type='image/x-icon'>
-    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
-    <link rel="apple-touch-icon" sizes="180x180" href="/icon.png">
-    <link rel="icon" type="image/png" sizes="192x192" href="/icon.png">
-
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Evo Web Radio</title>
-    <style>
-      html {font-family: Arial; display: inline-block; text-align: center;}
-      h2 {font-size: 1.3rem;}
-      p {font-size: 0.95rem;}
-      table {border: 1px solid black; border-collapse: collapse; margin: 0px 0px;}
-      td, th {font-size: 0.8rem; border: 1px solid gray; border-collapse: collapse;}
-      td:hover {font-weight:bold;}
-      a {color: black; text-decoration: none;}
-      body {max-width: 1380px; margin:0px auto; padding-bottom: 25px; background: #D0D0D0;}
-      .slider {-webkit-appearance: none; margin: 14px; width: 330px; height: 10px; background: #4CAF50; outline: none; -webkit-transition: .2s; transition: opacity .2s; border-radius: 5px;}
-      .slider::-webkit-slider-thumb {-webkit-appearance: none; appearance: none; width: 35px; height: 25px; background: #4a4a4a; cursor: pointer; border-radius: 5px;}
-      .slider::-moz-range-thumb { width: 35px; height: 35px; background: #4a4a4a; cursor: pointer; border-radius: 5px;} 
-      .button { background-color: #4CAF50; border: 1; color: white; padding: 10px 20px; border-radius: 5px;}
-      .buttonBank { background-color: #4CAF50; border: 1; color: white; padding: 8px 8px; border-radius: 5px; width: 35px; height: 35px; margin: 0 1.5px;}
-      .buttonBankSelected { background-color: #505050; border: 1; color: white; padding: 8px 8px; border-radius: 5px; width: 35px; height: 35px; margin: 0 1.5px;}
-      .buttonBank:active {background-color: #4a4a4a box-shadow: 0 4px #666; transform: translateY(2px);}
-      .buttonBank:hover {background-color: #4a4a4a;}
-      .button:hover {background-color: #4a4a4a;}
-      .button:active {background-color: #4a4a4a; box-shadow: 0 4px #666; transform: translateY(2px);}
-      .column { align: center; padding: 5px; display: flex; justify-content: space-between;}
-      .columnlist { align: center; padding: 10px; display: flex; justify-content: center;}
-      .stationList {text-align:left; margin-top: 0px; width: 280px; margin-bottom:0px;cursor: pointer;}
-      .stationNumberList {text-align:center; margin-top: 0px; width: 35px; margin-bottom:0px;}
-      .stationListSelected {text-align:left; margin-top: 0px; width: 280px; margin-bottom:0px;cursor: pointer; background-color: #4CAF50;}
-      .stationNumberListSelected {text-align:center; margin-top: 0px; width: 35px; margin-bottom:0px; background-color: #4CAF50;}
-      .station-name   
-    </style>
-  </head>
-
-  <body>
-    <h2>Evo Web Radio</h2>
-  
-    <div id="display" style="display: inline-block; padding: 5px; border: 2px solid #4CAF50; border-radius: 15px; background-color: #4a4a4a; font-size: 1.45rem; 
-      color: #AAA; width: 345px; text-align: center; white-space: nowrap; box-shadow: 0 0 20px #4CAF50;" onClick="flashBackground(); displayMode()">
-      
-      <div style="margin-bottom: 10px; font-weight: bold; overflow: hidden; text-overflow: ellipsis; -webkit-text-stroke: 0.3px black; text-stroke: 0.3px black;">
-        <span id="textStationName"><b>STATIONNAME</b></span>
-      </div>
-      
-      <div style="width: 345px; margin-bottom: 10px;">
-        <div id="stationTextDiv" style="display: block; text-overflow: ellipsis; white-space: normal; font-size: 1.0rem; color: #999; margin-bottom: 10px; text-align: center; align-items: center; height: 4.2em; justify-content: center; overflow: hidden; line-height: 1.4em;">
-          <span id="stationText">STATIONTEXT</span>
-        </div>
-      </div>
-      
-      <div style="height: 1px; background-color: #4CAF50; margin: 5px 0;"></div>
-
-      
-      <div style="display: flex; justify-content: center; gap: 25px; font-size: 1.0rem; color: #999;">
-        <div><span id="bankValue">Bank: --</span></div>
-      
-        <div style="display: flex; justify-content: center; gap: 10px; font-size: 0.65rem; color: #999;margin: 3px 0;">
-          <div><span id="samplerate">---.-kHz</span></div>
-          <div><span id="bitrate">---bit</span></div>
-          <div><span id="bitpersample">---kbps</span></div>
-          <div><span id="streamformat">----</span></div>
-        </div>
-        
-        <div><span id="stationNumber">Station: --</span></div>
-      </div>
-
-  </div>
-  <br>
-  <br>
-  <script>
-
-  var websocket;
-
-  function updateSliderVolume(element) 
-  {
-    var sliderValue = document.getElementById("volumeSlider").value;
-    document.getElementById("textSliderValue").innerText = sliderValue;
-
-    if (websocket && websocket.readyState === WebSocket.OPEN) 
-    {
-      websocket.send("volume:" + sliderValue);
-    } 
-    else 
-    {
-      console.warn("WebSocket niepołączony");
-    }
-  }
-
-  function changeStation(number) 
-  {
-    if (websocket.readyState === WebSocket.OPEN) 
-    {
-      websocket.send("station:" + number);
-    } 
-    else 
-    {
-      console.log("WebSocket nie jest otwarty");
-    }
-  }
-
-  function changeBank(number) 
-  {
-    if (websocket.readyState === WebSocket.OPEN) 
-    {
-      websocket.send("bank:" + number);
-    } 
-    else 
-    {
-      console.log("WebSocket nie jest otwarty");
-    }
-  }
-
-
-  function displayMode() 
-  {
-    //fetch("/displayMode")
-    if (websocket.readyState === WebSocket.OPEN) 
-    {
-      websocket.send("displayMode");
-    } 
-    else 
-    {
-      console.log("WebSocket nie jest otwarty");
-    }
-  }
-  
-  
-  function connectWebSocket() 
-  {
-    websocket = new WebSocket('ws://' + window.location.hostname + '/ws');
-    websocket.onopen = function () 
-    {
-      console.log("WebSocket polaczony");
-    };
-    
-    websocket.onclose = function (event) 
-    {
-      console.log("WebSocket zamkniety. Proba ponownego polaczenia za 3 sekundy...");
-      setTimeout(connectWebSocket, 3000); // próba ponownego połączenia
-    };
-
-    websocket.onerror = function (error) 
-    {
-      console.error("Blad WebSocket: ", error);
-      websocket.close(); // zamyka połączenie, by wywołać reconnect
-    };
-    
-    websocket.onmessage = function(event) 
-    {
-      if (event.data === "reload") 
-      {
-        location.reload();
-      }  
-      
-      if (event.data.startsWith("volume:")) 
-      {
-        var vol = parseInt(event.data.split(":")[1]);
-        document.getElementById("volumeSlider").value = vol;
-        document.getElementById("textSliderValue").innerText = vol;
-      }
-      
-      if (event.data.startsWith("station:")) 
-      {
-        var station = parseInt(event.data.split(":")[1]);
-        highlightStation(station);
-        //document.getElementById('stationNumber').innerText = event.data.split(':')[1];
-        document.getElementById('stationNumber').innerText ='Station: ' + station; 
-      }
-      
-      if (event.data.startsWith("stationname:")) 
-      {
-        var value = event.data.split(":")[1];
-        document.getElementById("textStationName").innerHTML = `<b>${value}</b>`;
-        //checkStationTextLength();
-      }  
-
-      if (event.data.startsWith("stationtext$")) 
-      {
-        var stationtext = event.data.split("$")[1];
-        document.getElementById("stationText").innerHTML = `${stationtext}`;
-        //checkStationTextLength();
-      }  
-
-      if (event.data.startsWith("bank:")) 
-      {
-        var bankValue = parseInt(event.data.split(":")[1]);
-        document.getElementById('bankValue').innerText = 'Bank: ' + bankValue;
-      } 
-
-      if (event.data.startsWith("samplerate:")) 
-      {
-        var samplerate = parseInt(event.data.split(":")[1]);
-        var formattedRate = (samplerate / 1000).toFixed(1) + "kHz";
-        document.getElementById('samplerate').innerText = formattedRate;
-      }
-      
-      if (event.data.startsWith("bitrate:")) 
-      {	
-        var bitrate = parseInt(event.data.split(":")[1]);
-        document.getElementById('bitrate').innerText = bitrate + 'kbps';
-      }  
-      
-      if (event.data.startsWith("bitpersample:")) 
-      {	
-        var bitpersample = parseInt(event.data.split(":")[1]);
-        document.getElementById('bitpersample').innerText = bitpersample + 'bit';
-      }  
-      
-      if (event.data.startsWith("streamformat:")) 
-      {	
-        var streamformat = event.data.split(":")[1];
-        document.getElementById('streamformat').innerText = streamformat;
-      }  
-
-    }
-
-  };
-  
-  function highlightStation(stationId) 
-  {
-    // Usuń poprzednie zaznaczenia
-    document.querySelectorAll(".stationList").forEach(el => {
-    el.classList.remove("stationListSelected");
-    el.innerHTML = el.dataset.stationName || el.innerText; // przywróć oryginalny numer
-    });
-
-    document.querySelectorAll(".stationNumberList").forEach(el => {
-      el.classList.remove("stationNumberListSelected");
-      el.innerHTML = el.dataset.stationNumber || el.innerText; // przywróć oryginalny numer
-    });
-
-    // Zaznacz nową stację
-    const numCells = document.querySelectorAll(".stationNumberList");
-    const stationCells = document.querySelectorAll(".stationList");
-
-    const numCell = numCells[stationId - 1];
-    const stationCell = stationCells[stationId - 1];
-
-    if (numCell && stationCell) 
-    {
-      numCell.classList.add("stationNumberListSelected");
-      stationCell.classList.add("stationListSelected");
-      
-      // Pogrub nazwę stacji
-      stationCell.dataset.stationName = stationCell.innerText; // zapisz oryginalny tekst
-      stationCell.innerHTML = `<b>${stationCell.innerText}</b>`; // pogrubienie nazwy stacji
-        
-      // Pogrub numer
-      numCell.dataset.stationNumber = numCell.innerText; // zapisz oryginalny numer
-      numCell.innerHTML = `<b>${numCell.innerText}</b>`; 
-    }
-  }
-  
-  function flashBackground() 
-	{
-	  const div = document.getElementById('display');
-	  const originalColor = div.style.backgroundColor;
-
-	  const textSpan = document.getElementById('textStationName');
-    const originalText = textSpan.innerText;
-
-
-	  div.style.backgroundColor = '#115522'; // kolor flash
-	  //textSpan.innerText = 'OLED Display Mode Changed';
-    textSpan.innerHTML = '<b>Display Mode Changed</b>';  
-
-	  setTimeout(() => 
-	  {
-		  div.style.backgroundColor = originalColor;
-		  //textSpan.innerText = originalText;
-      textSpan.innerHTML = `<b>${originalText}</b>`;
-	  }, 150); // czas w ms flasha
-	}
-
-
-  document.addEventListener("DOMContentLoaded", function () 
-  {
-    connectWebSocket(); // podlaczamy websockety
-
-    const slider = document.getElementById("volumeSlider");
-    slider.addEventListener("wheel", function (event) 
-    {
-      event.preventDefault(); // zapobiega przewijaniu strony
-
-      let currentValue = parseInt(slider.value);
-      const step = parseInt(slider.step) || 1;
-      const max = parseInt(slider.max);
-      const min = parseInt(slider.min);
-
-      if (event.deltaY < 0) {
-        // przewijanie w górę (zwiększ)
-        slider.value = Math.min(currentValue + step, max);
-      } else {
-        // przewijanie w dół (zmniejsz)
-        slider.value = Math.max(currentValue - step, min);
-      }
-
-      updateSliderVolume(slider); // wywołaj aktualizację
-    });
-  });
-
-  window.onpageshow = function(event) 
-  {
-    if (event.persisted) 
-    {
-      window.location.reload();
-    }
-  };
-
- </script>
-
-)rawliteral";
-
-const char list_html[] PROGMEM = R"rawliteral(
-  <!DOCTYPE HTML><html>
-  <head>
-    <link rel='icon' href='/favicon.ico' type='image/x-icon'>
-    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
-    <link rel="apple-touch-icon" sizes="180x180" href="/icon.png">
-    <link rel="icon" type="image/png" sizes="192x192" href="/icon.png">
-
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Evo Web Radio</title>
-    <style>
-      html {font-family: Arial; display: inline-block; text-align: center;}
-      h2 {font-size: 1.3rem;}
-      p {font-size: 1.1rem;}
-      table {border: 1px solid black; border-collapse: collapse; margin: 0px 0px;}
-      td, th {font-size: 0.8rem; border: 1px solid gray; border-collapse: collapse;}
-      td:hover {font-weight:bold;}
-      a {color: black; text-decoration: none;}
-      body {max-width: 1380px; margin:0px auto; padding-bottom: 25px;}
-      .columnlist { align: center; padding: 10px; display: flex; justify-content: center;}
-    </style>
-  </head>
-)rawliteral";
-
-const char config_html[] PROGMEM = R"rawliteral(
-  <!DOCTYPE HTML>
-  <html>
-  <head>
-    <link rel='icon' href='/favicon.ico' type='image/x-icon'>
-    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
-    <link rel="apple-touch-icon" sizes="180x180" href="/icon.png">
-    <link rel="icon" type="image/png" sizes="192x192" href="/icon.png">
-
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Evo Web Radio</title>
-    <style>
-      html {font-family: Arial; display: inline-block; text-align: center;}
-      h1 {font-size: 2.3rem;}
-      h2 {font-size: 1.3rem;}
-      table {border: 1px solid black; border-collapse: collapse; margin: 20px auto; width: 80%;}
-      th, td {font-size: 1rem; border: 1px solid gray; padding: 8px; text-align: left;}
-      td:hover {font-weight: bold;}
-      a {color: black; text-decoration: none;}
-      body {max-width: 1380px; margin:0 auto; padding-bottom: 25px;}
-      .tableSettings {border: 2px solid #4CAF50; border-collapse: collapse; margin: 10px auto; width: 60%;}
-    </style>
-    </head>
-
-  <body>
-  <h2>Evo Web Radio - Settings</h2>
-  <form action="/configupdate" method="POST">
-  <table class="tableSettings">
-  <tr><th>Setting</th><th>Value</th></tr>
-  <tr><td>Normal Display Brightness (0-255), default:180</td><td><input type="number" name="displayBrightness" min="1" max="255" value="%D1"></td></tr>
-  <tr><td>Dimmed Display Brightness (0-255), default:20</td><td><input type="number" name="dimmerDisplayBrightness" min="1" max="255" value="%D2"></td></tr>
-  <tr><td>Auto Dimmer Delay Time (1-255 sec.), default:5</td><td><input type="number" name="displayAutoDimmerTime" min="1" max="255" value="%D3"></td></tr>
-  <tr><td>Auto Dimmer, default:On</td><td><select name="displayAutoDimmerOn"><option value="1"%S1>On</option><option value="0"%S2>Off</option></select></td></tr>
-  <tr><td>Time Voice Info Every Hour, default:On</td><td><select name="timeVoiceInfoEveryHour"><option value="1"%S3>On</option><option value="0"%S4>Off</option></select></td></tr>
-  <tr><td>VU Meter Mode (0-1),    0-dashed lines, 1-continuous lines</td><td><input type="number" name="vuMeterMode" min="0" max="1" value="%D4"></td></tr>
-  <tr><td>Encoder Function Order (0-1),   0-Volume, click for station list, 1-Station list, click for Volume</td><td><input type="number" name="encoderFunctionOrder" min="0" max="1" value="%D5"></td></tr>
-  <tr><td>Display Mode (0-2),   0-Radio scroller, 1-Clock, 2-Three lines without scroll</td><td><input type="number" name="displayMode" min="0" max="2" value="%D6"></td></tr>
-
-  
-
-  <!-- <tr><td>VU Meter Refresh Time (20-100ms)</td><td><input type="number" name="vuMeterRefreshTime" min="15" max="100" value="%D7"></td></tr> -->
-
-  <tr><td>Radio Scroller & VU Meter Refresh Time (15-100ms), default:50</td><td><input type="number" name="scrollingRefresh" min="15" max="100" value="%D8"></td></tr>
-  <tr><td>ADC Keyboard Enabled, default:Off</td><td><select name="adcKeyboardEnabled"><option value="1"%S7>On</option><option value="0"%S8>Off</option></select></td></tr>
-
-  <tr><td>OLED Power Save Mode, default:Off</td><td><select name="displayPowerSaveEnabled"><option value="1"%S9>On</option><option value="0"%S10>Off</option></select></td></tr>
-  <tr><td>OLED Power Save Time (1-600sek.), default:20</td><td><input type="number" name="displayPowerSaveTime" min="1" max="600" value="%D9"></td></tr>
-  <tr><td>Volume Steps 1-21 [Off], 1-42  [On], default:Off</td><td><select name="maxVolumeExt"><option value="1"%S11>On</option><option value="0"%S12>Off</option></select></td></tr>
-  <tr><td>Station Name Read From Stream [On-From Stream, Off-From Bank] EXPERIMENTAL</td><td><select name="stationNameFromStream"><option value="1"%S17>On</option><option value="0"%S18>Off</option></select></td></tr>
-  <tr><th><b>VU Meter Settings</b></th></tr>
-  <tr><td>VU Meter Visible (Mode 0 only), default:On</td><td><select name="vuMeterOn"><option value="1"%S5>On</option><option value="0"%S6>Off</option></select></td></tr>
-  <tr><td>VU Meter Peak & Hold Function, default:On </td><td><select name="vuPeakHoldOn"><option value="1"%13>On</option><option value="0"%S14>Off</option></select></td></tr>
-  <tr><td>VU Meter Smooth Function, default:On </td><td><select name="vuSmooth"><option value="1"%S15>On</option><option value="0"%S16>Off</option></select></td></tr>
-
-  <tr><td>VU Meter Smooth Rise Speed [1 low - 32 High], default:24</td><td><input type="number" name="vuRiseSpeed" min="1" max="32" value="%D10"></td></tr>
-  <tr><td>VU Meter Smooth Fall Speed [1 low - 32 High], default:6</td><td><input type="number" name="vuFallSpeed" min="1" max="32" value="%D11"></td></tr>
-  
-
-  </table>
-  <input type="submit" value="Update">
-  </form>
-  <p style='font-size: 0.8rem;'><a href='/menu'>Go Back</a></p>
-  </body>
-  </html>
-)rawliteral";
-
-const char adc_html[] PROGMEM = R"rawliteral(
-  <!DOCTYPE HTML>
-  <html>
-  <head>
-    <link rel='icon' href='/favicon.ico' type='image/x-icon'>
-    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
-    <link rel="apple-touch-icon" sizes="180x180" href="/icon.png">
-    <link rel="icon" type="image/png" sizes="192x192" href="/icon.png">
-
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Evo Web Radio</title>
-    <style>
-      html {font-family: Arial; display: inline-block; text-align: center;}
-      h1 {font-size: 2.3rem;}
-      h2 {font-size: 1.3rem;}
-      table {border: 1px solid black; border-collapse: collapse; margin: 10px auto; width: 40%;}
-      th, td {font-size: 1rem; border: 1px solid gray; padding: 8px; text-align: left;}
-      td:hover {font-weight: bold;}
-      a {color: black; text-decoration: none;}
-      body {max-width: 1380px; margin:0 auto; padding-bottom: 15px;}
-      .tableSettings {border: 2px solid #4CAF50; border-collapse: collapse; margin: 10px auto; width: 40%;}
-    </style>
-    </head>
-
-  <body>
-  <h2>Evo Web Radio - ADC Settings</h2>
-  <form action="/configadc" method="POST">
-  <table class="tableSettings">
-  <tr><th>Button</th><th>Value</th></tr>
-  <tr><td>keyboardButtonThreshold_0</td><td><input type="number" name="keyboardButtonThreshold_0" min="0" max="4095" value="%D0"></td></tr>
-  <tr><td>keyboardButtonThreshold_1</td><td><input type="number" name="keyboardButtonThreshold_1" min="0" max="4095" value="%D1"></td></tr>
-  <tr><td>keyboardButtonThreshold_2</td><td><input type="number" name="keyboardButtonThreshold_2" min="0" max="4095" value="%D2"></td></tr>
-  <tr><td>keyboardButtonThreshold_3</td><td><input type="number" name="keyboardButtonThreshold_3" min="0" max="4095" value="%D3"></td></tr>
-  <tr><td>keyboardButtonThreshold_4</td><td><input type="number" name="keyboardButtonThreshold_4" min="0" max="4095" value="%D4"></td></tr>
-  <tr><td>keyboardButtonThreshold_5</td><td><input type="number" name="keyboardButtonThreshold_5" min="0" max="4095" value="%D5"></td></tr>
-  <tr><td>keyboardButtonThreshold_6</td><td><input type="number" name="keyboardButtonThreshold_6" min="0" max="4095" value="%D6"></td></tr>
-  <tr><td>keyboardButtonThreshold_7</td><td><input type="number" name="keyboardButtonThreshold_7" min="0" max="4095" value="%D7"></td></tr>
-  <tr><td>keyboardButtonThreshold_8</td><td><input type="number" name="keyboardButtonThreshold_8" min="0" max="4095" value="%D8"></td></tr>
-  <tr><td>keyboardButtonThreshold_9</td><td><input type="number" name="keyboardButtonThreshold_9" min="0" max="4095" value="%D9"></td></tr>
-  <tr><td>keyboardButtonThreshold_Shift - Ok/Enter</td><td><input type="number" name="keyboardButtonThreshold_Shift" min="0" max="4095" value="%D10"></td></tr>
-  <tr><td>keyboardButtonThreshold_Memory - Bank Menu</td><td><input type="number" name="keyboardButtonThreshold_Memory" min="0" max="4095" value="%D11"></td></tr>
-  <tr><td>keyboardButtonThreshold_Band -  Back</td><td><input type="number" name="keyboardButtonThreshold_Band" min="0" max="4095" value="%D12"></td></tr>
-  <tr><td>keyboardButtonThreshold_Auto -  Display Mode</td><td><input type="number" name="keyboardButtonThreshold_Auto" min="0" max="4095" value="%D13"></td></tr>
-  <tr><td>keyboardButtonThreshold_Scan - Dimmer/Network Bank Update</td><td><input type="number" name="keyboardButtonThreshold_Scan" min="0" max="4095" value="%D14"></td></tr>
-  <tr><td>keyboardButtonThreshold_Mute - Mute</td><td><input type="number" name="keyboardButtonThreshold_Mute" min="0" max="4095" value="%D15"></td></tr>
-  <tr><td>keyboardButtonThresholdTolerance</td><td><input type="number" name="keyboardButtonThresholdTolerance" min="0" max="50" value="%D16"></td></tr>
-  <tr><td>keyboardButtonNeutral</td><td><input type="number" name="keyboardButtonNeutral" min="0" max="4095" value="%D17"></td></tr>
-  <tr><td>keyboardSampleDelay (30-300ms)</td><td><input type="number" name="keyboardSampleDelay" min="30" max="300" value="%D18"></td></tr>
-  </table>
-  <input type="submit" value="ADC Thresholds Update">
-  </form>
-  <br>
-  <button onclick="toggleAdcDebug()">ADC Debug ON/OFF</button>
-  <script>
-  function toggleAdcDebug() {
-      const xhr = new XMLHttpRequest();
-      xhr.open("POST", "/toggleAdcDebug", true);
-      xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-      xhr.onload = function() {
-          if (xhr.status === 200) {
-              alert("ADC Debug is now " + (xhr.responseText === "1" ? "ON" : "OFF"));
-          } else {
-              alert("Error: " + xhr.statusText);
-          }
-      };
-      xhr.send(); // Wysyłanie pustego zapytania POST
-  }
-  </script>
-
-
-  <p style='font-size: 0.8rem;'><a href='/menu'>Go Back</a></p>
-  </body>
-  </html>
-)rawliteral";
-
-const char menu_html[] PROGMEM = R"rawliteral(
-  <!DOCTYPE HTML><html>
-  <head>
-  <link rel='icon' href='/favicon.ico' type='image/x-icon'>
-  <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
-  <link rel="apple-touch-icon" sizes="180x180" href="/icon.png">
-  <link rel="icon" type="image/png" sizes="192x192" href="/icon.png">
-
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Evo Web Radio</title>
-  <style>
-    html {font-family: Arial; display: inline-block; text-align: center;}
-    h2 {font-size: 1.3rem;}
-    p {font-size: 1.1rem;}
-    a {color: black; text-decoration: none;}
-    body {max-width: 1380px; margin:0px auto; padding-bottom: 25px;}
-    .button { background-color: #4CAF50; border: 1; color: white; padding: 10px 20px; border-radius: 5px; width:200px;}
-    .button:hover {background-color: #4a4a4a;}
-    .button:active {background-color: #4a4a4a; box-shadow: 0 4px #666; transform: translateY(2px);}
-    
-  </style>
-  </head>
-  <body>
-  <h2>Evo Web Radio - Menu</h2>
-  <!-- <br><button class="button" onclick="location.href='/fwupdate'">OTA Update (Old)</button><br> -->
-  <br><button class="button" onclick="location.href='/info'">Info</button><br>
-  <br><button class="button" onclick="location.href='/ota'">OTA Update</button><br>
-  <br><button class="button" onclick="location.href='/adc'">ADC Keyboard Settings</button><br>
-  <br><button class="button" onclick="location.href='/list'">SD / SPIFFS Explorer</button><br>
-  <br><button class="button" onclick="location.href='/editor'">Memory Bank Editor</button><br>
-  <br><button class="button" onclick="location.href='/config'">Settings</button><br>
-  <br><p style='font-size: 0.8rem;'><a href="#" onclick="window.location.replace('/')">Go Back</a></p>
-  </body></html>
-
-)rawliteral";
-
-const char info_html[] PROGMEM = R"rawliteral(
-<!DOCTYPE HTML>
-  <html>
-  <head>
-    <link rel='icon' href='/favicon.ico' type='image/x-icon'>
-    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
-    <link rel="apple-touch-icon" sizes="180x180" href="/icon.png">
-    <link rel="icon" type="image/png" sizes="192x192" href="/icon.png">
-
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Evo Web Radio</title>
-    <style>
-      html {font-family: Arial; display: inline-block; text-align: center;}
-      h2 {font-size: 1.3rem;}
-      table {border: 1px solid black; border-collapse: collapse; margin: 10px auto; width: 40%;}
-      th, td {font-size: 1rem; border: 1px solid gray; padding: 8px; text-align: left;}
-      td:hover {font-weight: bold;}
-      a {color: black; text-decoration: none;}
-	  
-      body {max-width: 1380px; margin:0 auto; padding-bottom: 15px;}
-      .tableSettings {border: 2px solid #4CAF50; border-collapse: collapse; margin: 10px auto; width: 40%;} 
-	  .signal-bars {display: inline-block; vertical-align: middle; margin-left: 10px;}
-	  .bar {display: inline-block; width: 5px; margin-right: 2px; background-color: #F2F2F2; height: 10px;}
-      .bar.active { background-color: #4CAF50;}
-	  
-    </style>
-    </head>
-
-  <body>
-  <h2>Evo Web Radio - Info</h2>
-  <form action="/configadc" method="POST">
-  <table class="tableSettings">
-
-  <tr><td>ESP Serial Number:</td><td><input name="espSerial" value="%D0"></td></tr>
-  <tr><td>Firmware version:</td><td><input name="espFw" value="%D1"></td></tr>
-  <tr><td>Hostname:</td><td><input name="hostnameValue" value="%D2"></td></tr>
-  <tr><td>WiFi Signal Strength:</td><td><input id="wifiSignal" value="%D3"> dBm
-  <div class="signal-bars" id="signalBars">
-      <div class="bar" style="height:2px;"></div>
-      <div class="bar" style="height:6px;"></div>
-      <div class="bar" style="height:10px;"></div>
-      <div class="bar" style="height:14px;"></div>
-      <div class="bar" style="height:18px;"></div>
-      <div class="bar" style="height:22px;"></div>
-    </div>
-
-
-  </td></tr>
-  <tr><td>WiFi SSID:</td><td><input name="wifiSsid" value="%D4"></td></tr>
-  <tr><td>IP number:</td><td><input name="ipValue" value="%D5"></td></tr>
-  <tr><td>MAC Address:</td><td><input name="macValue" value="%D6"></td></tr>
-  
-  </table>
-  </form>
-  <br>
-  <p style='font-size: 0.8rem;'><a href='/menu'>Go Back</a></p>
-  
-<script>
-  function updateSignalBars(signal) {
-    const bars = document.querySelectorAll('#signalBars .bar');
-    let level = 0;
-
-    signal = parseInt(signal);
-
-    if (signal >= -50) level = 6;
-    else if (signal >= -57) level = 5;
-    else if (signal >= -66) level = 4;
-    else if (signal >= -74) level = 3;
-    else if (signal >= -81) level = 2;
-    else if (signal >= -88) level = 1;
-    else level = 0;
-
-    bars.forEach((bar, index) => {
-      if (index < level) {
-        bar.classList.add('active');
-      } else {
-        bar.classList.remove('active');
-      }
-    });
-  }
-
-  const signalInput = document.getElementById('wifiSignal');
-  updateSignalBars(signalInput.value);
-
- </script>
-  </body>
-  </html>
-)rawliteral";
 
 
 
 char stations[MAX_STATIONS][STATION_NAME_LENGTH + 1];  // Tablica przechowująca linki do stacji radiowych (jedna na stację) +1 dla terminatora null
 
-const char *ntpServer1 = "pool.ntp.org";  // Adres serwera NTP używany do synchronizacji czasu
-const char *ntpServer2 = "time.nist.gov"; // Adres serwera NTP używany do synchronizacji czasu
-const long gmtOffset_sec = 3600;          // Przesunięcie czasu UTC w sekundach
-const int daylightOffset_sec = 3600;      // Przesunięcie czasu letniego w sekundach, dla Polski to 1 godzina
+const char *ntpServer1 = "ntp1.cn";  // Adres serwera NTP używany do synchronizacji czasu
+const char *ntpServer2 = "ntp1.aliyun.com"; // Adres serwera NTP używany do synchronizacji czasu
+const long gmtOffset_sec = 8 * 3600;          // Przesunięcie czasu UTC w sekundach
+const int daylightOffset_sec = 0;      // Przesunięcie czasu letniego w sekundach, dla Polski to 1 godzina
 
-
-const uint8_t spleen6x12PL[2954] U8G2_FONT_SECTION("spleen6x12PL") =
-  "\340\1\3\2\3\4\1\3\4\6\14\0\375\10\376\11\377\1\225\3]\13f \7\346\361\363\237\0!\12"
-  "\346\361#i\357`\316\0\42\14\346\361\3I\226dI\316/\0#\21\346\361\303I\64HI\226dI"
-  "\64HIN\6$\22\346q\205CRK\302\61\311\222,I\206\60\247\0%\15\346\361cQK\32\246"
-  "I\324\316\2&\17\346\361#Z\324f\213\22-Zr\42\0'\11\346\361#i\235\237\0(\13\346\361"
-  "ia\332s\254\303\0)\12\346\361\310\325\36\63\235\2*\15\346\361S\243L\32&-\312\31\1+\13"
-  "\346\361\223\323l\320\322\234\31,\12\346\361\363)\15s\22\0-\11\346\361s\32t\236\0.\10\346\361"
-  "\363K\316\0/\15\346q\246a\32\246a\32\246\71\15\60\21\346\361\3S\226DJ\213\224dI\26\355"
-  "d\0\61\12\346\361#\241\332\343N\6\62\16\346\361\3S\226\226\246\64\35t*\0\63\16\346\361\3S"
-  "\226fr\232d\321N\6\64\14\346q\247\245\236\6\61\315\311\0\65\16\346q\17J\232\16qZ\31r"
-  "\62\0\66\20\346\361\3S\232\16Q\226dI\26\355d\0\67\13\346q\17J\226\206\325v\6\70\20\346"
-  "\361\3S\226d\321\224%Y\222E;\31\71\17\346\361\3S\226dI\26\15ii'\3:\11\346\361"
-  "\263\346L\71\3;\13\346\361\263\346\264\64\314I\0<\12\346\361cak\334N\5=\13\346\361\263\15"
-  ":\60\350\334\0>\12\346\361\3qk\330\316\2\77\14\346\361\3S\226\206\325\34\314\31@\21\346\361\3"
-  "S\226dI\262$K\262\304CN\5A\22\346\361\3S\226dI\226\14J\226dI\226S\1B\22"
-  "\346q\17Q\226d\311\20eI\226d\311\220\223\1C\14\346\361\3C\222\366<\344T\0D\22\346q"
-  "\17Q\226dI\226dI\226d\311\220\223\1E\16\346\361\3C\222\246C\224\226\207\234\12F\15\346\361"
-  "\3C\222\246C\224\266\63\1G\21\346\361\3C\222V\226,\311\222,\32r*\0H\22\346qgI"
-  "\226d\311\240dI\226dI\226S\1I\12\346\361\3c\332\343N\6J\12\346\361\3c\332\233\316\2"
-  "K\21\346qgI\226D\321\26\325\222,\311r*\0L\12\346q\247}\36r*\0M\20\346qg"
-  "\211eP\272%Y\222%YN\5N\20\346qg\211\224HI\77)\221\222\345T\0O\21\346\361\3"
-  "S\226dI\226dI\226d\321N\6P\17\346q\17Q\226dI\226\14QZg\2Q\22\346\361\3"
-  "S\226dI\226dI\226d\321\252\303\0R\22\346q\17Q\226dI\226\14Q\226dI\226S\1S"
-  "\16\346\361\3C\222\306sZ\31r\62\0T\11\346q\17Z\332w\6U\22\346qgI\226dI\226"
-  "dI\226d\321\220S\1V\20\346qgI\226dI\226dI\26m;\31W\21\346qgI\226d"
-  "I\226\264\14\212%\313\251\0X\21\346qgI\26%a%\312\222,\311r*\0Y\20\346qgI"
-  "\226dI\26\15ie\310\311\0Z\14\346q\17j\330\65\35t*\0[\13\346\361\14Q\332\257C\16"
-  "\3\134\15\346q\244q\32\247q\32\247\71\14]\12\346\361\14i\177\32r\30^\12\346\361#a\22e"
-  "\71\77_\11\346\361\363\353\240\303\0`\11\346\361\3q\235_\0a\16\346\361S\347hH\262$\213\206"
-  "\234\12b\20\346q\247\351\20eI\226dI\226\14\71\31c\14\346\361S\207$m\36r*\0d\21"
-  "\346\361ci\64$Y\222%Y\222ECN\5e\17\346\361S\207$K\262dP\342!\247\2f\14"
-  "\346\361#S\32\16Y\332\316\2g\21\346\361S\207$K\262$K\262hN\206\34\1h\20\346q\247"
-  "\351\20eI\226dI\226d\71\25i\13\346\361#\71\246v\325\311\0j\13\346\361C\71\230\366\246S"
-  "\0k\16\346q\247\245J&&YT\313\251\0l\12\346\361\3i\237u\62\0m\15\346\361\23\207("
-  "\351\337\222,\247\2n\20\346\361\23\207(K\262$K\262$\313\251\0o\16\346\361S\247,\311\222,"
-  "\311\242\235\14p\21\346\361\23\207(K\262$K\262d\210\322*\0q\20\346\361S\207$K\262$K"
-  "\262hH[\0r\14\346\361S\207$K\322v&\0s\15\346\361S\207$\236\323d\310\311\0t\13"
-  "\346\361\3i\70\246\315:\31u\20\346\361\23\263$K\262$K\262h\310\251\0v\16\346\361\23\263$"
-  "K\262$\213\222\60gw\17\346\361\23\263$KZ\6\305\222\345T\0x\16\346\361\23\263$\213\266)"
-  "K\262\234\12y\22\346\361\23\263$K\262$K\262hH\223!G\0z\14\346\361\23\7\65l\34t"
-  "*\0{\14\346\361iiM\224\323\262\16\3|\10\346q\245\375;\5}\14\346\361\310iY\324\322\232"
-  "N\1~\12\346\361s\213\222D\347\10\177\7\346\361\363\237\0\200\6\341\311\243\0\201\6\341\311\243\0\202"
-  "\6\341\311\243\0\203\6\341\311\243\0\204\6\341\311\243\0\205\6\341\311\243\0\206\6\341\311\243\0\207\6\341"
-  "\311\243\0\210\6\341\311\243\0\211\6\341\311\243\0\212\6\341\311\243\0\213\6\341\311\243\0\214\16\346\361e"
-  "C\222\306sZ\31r\62\0\215\6\341\311\243\0\216\6\341\311\243\0\217\14\346qe\203T\354\232\16:"
-  "\25\220\6\341\311\243\0\221\6\341\311\243\0\222\6\341\311\243\0\223\6\341\311\243\0\224\6\341\311\243\0\225"
-  "\6\341\311\243\0\226\6\341\311\243\0\227\16\346\361eC\222\306sZ\31r\62\0\230\6\341\311\243\0\231"
-  "\6\341\311\243\0\232\6\341\311\243\0\233\6\341\311\243\0\234\16\346\361\205\71\66$\361\234&CN\6\235"
-  "\6\341\311\243\0\236\6\341\311\243\0\237\15\346\361\205\71\64\250a\343\240S\1\240\7\346\361\363\237\0\241"
-  "\23\346\361\3S\226dI\226\14J\226dI\26\306\71\0\242\21\346\361\23\302!\251%Y\222%\341\220"
-  "\345\24\0\243\14\346q\247-\231\230\306CN\5\244\22\346\361\3S\226dI\226\14J\226dI\26\346"
-  "\4\245\22\346\361\3S\226dI\226\14J\226dI\26\346\4\246\16\346\361eC\222\306sZ\31r\62"
-  "\0\247\17\346\361#Z\224\245Z\324\233\232E\231\4\250\11\346\361\3I\316\237\1\251\21\346\361\3C\22"
-  "J\211\22)\221bL\206\234\12\252\15\346\361#r\66\325vd\310\31\1\253\17\346\361\223\243$J\242"
-  "\266(\213r\42\0\254\14\346qe\203T\354\232\16:\25\255\10\346\361s\333y\3\256\21\346\361\3C"
-  "\22*\226d\261$c\62\344T\0\257\14\346qe\203\32vM\7\235\12\260\12\346\361#Z\324\246\363"
-  "\11\261\20\346\361S\347hH\262$\213\206\64\314\21\0\262\14\346\361#Z\224\206\305!\347\6\263\13\346"
-  "\361\3i\252\251\315:\31\264\11\346\361Ca\235\337\0\265\14\346\361\23\243\376i\251\346 \0\266\16\346"
-  "\361\205\71\66$\361\234&CN\6\267\10\346\361s\314y\4\270\11\346\361\363\207\64\14\1\271\20\346\361"
-  "S\347hH\262$\213\206\64\314\21\0\272\15\346\361#Z\324\233\16\15\71#\0\273\17\346\361\23\243,"
-  "\312\242\226(\211r\62\0\274\15\346\361\205\71\64\250a\343\240S\1\275\17\346\361\204j-\211\302\26\245"
-  "\24\26\207\0\276\21\346\361hQ\30'\222\64\206ZR\33\302\64\1\277\15\346\361#\71\64\250a\343\240"
-  "S\1\300\21\346\361\304\341\224%Y\62(Y\222%YN\5\301\21\346\361\205\341\224%Y\62(Y\222"
-  "%YN\5\302\22\346q\205I\66eI\226\14J\226dI\226S\1\303\23\346\361DI\242MY\222"
-  "%\203\222%Y\222\345T\0\304\20\346\361S\347hH\262$\213\206\64\314\21\0\305\16\346\361eC\222"
-  "\306sZ\31r\62\0\306\14\346\361eC\222\366<\344T\0\307\15\346\361\3C\222\366<di\30\2"
-  "\310\17\346\361\304\341\220\244\351\20\245\361\220S\1\311\17\346\361\205\341\220\244\351\20\245\361\220S\1\312\20"
-  "\346\361\3C\222\246C\224\226\207\64\314\21\0\313\17\346\361\324\241!I\323!J\343!\247\2\314\13\346"
-  "\361\304\341\230v\334\311\0\315\13\346\361\205\341\230v\334\311\0\316\14\346q\205I\66\246\35w\62\0\317"
-  "\13\346\361\324\241\61\355\270\223\1\320\15\346\361\3[\324\262D}\332\311\0\321\20\346\361EIV\221\22"
-  ")\351'%\322\251\0\322\20\346\361\304\341\224%Y\222%Y\222E;\31\323\20\346\361\205\341\224%Y"
-  "\222%Y\222E;\31\324\21\346q\205I\66eI\226dI\226d\321N\6\325\22\346\361DI\242M"
-  "Y\222%Y\222%Y\264\223\1\326\21\346\361\324\241)K\262$K\262$\213v\62\0\327\14\346\361S"
-  "\243L\324\242\234\33\0\330\20\346qFS\226DJ_\244$\213\246\234\6\331\21\346\361\304Y%K\262"
-  "$K\262$\213\206\234\12\332\21\346\361\205Y%K\262$K\262$\213\206\234\12\333\23\346q\205I\224"
-  "%Y\222%Y\222%Y\64\344T\0\334\22\346\361\324\221,\311\222,\311\222,\311\242!\247\2\335\17"
-  "\346\361\205Y%K\262hH+CN\6\336\21\346\361\243\351\20eI\226dI\226\14QN\3\337\17"
-  "\346\361\3Z\324%\213j\211\224$:\31\340\20\346q\305\71\64GC\222%Y\64\344T\0\341\20\346"
-  "\361\205\71\66GC\222%Y\64\344T\0\342\11\346\361Ca\235\337\0\343\21\346\361DI\242Cs\64"
-  "$Y\222ECN\5\344\20\346\361\3I\16\315\321\220dI\26\15\71\25\345\20\346q\205I\30\316\321"
-  "\220dI\26\15\71\25\346\15\346\361Ca\70$i\363\220S\1\347\15\346\361S\207$m\36\262\64\14"
-  "\1\350\20\346q\305\71\64$Y\222%\203\22\17\71\25\351\20\346\361\205\71\66$Y\222%\203\22\17\71"
-  "\25\352\20\346\361S\207$K\262dP\342!\254C\0\353\21\346\361\3I\16\15I\226d\311\240\304C"
-  "N\5\354\13\346q\305\71\244v\325\311\0\355\13\346\361\205\71\246v\325\311\0\356\14\346q\205I\16\251"
-  "]u\62\0\357\14\346\361\3I\16\251]u\62\0\360\21\346q$a%\234\262$K\262$\213v\62"
-  "\0\361\21\346\361\205\71\64DY\222%Y\222%YN\5\362\20\346q\305\71\64eI\226dI\26\355"
-  "d\0\363\20\346\361\205\71\66eI\226dI\26\355d\0\364\20\346q\205I\16MY\222%Y\222E"
-  ";\31\365\21\346\361c\222\222HI\226dI\66\15\221N\4\366\20\346\361\3I\16MY\222%Y\222"
-  "E;\31\367\13\346\361\223sh\320\241\234\31\370\17\346\361\223\242)RZ\244$\213\246\234\6\371\21\346"
-  "q\305\71\222%Y\222%Y\222ECN\5\372\21\346\361\205\71\224%Y\222%Y\222ECN\5\373"
-  "\22\346q\205I\216dI\226dI\226d\321\220S\1\374\22\346\361\3I\216dI\226dI\226d\321"
-  "\220S\1\375\23\346\361\205\71\224%Y\222%Y\222ECZ\31\42\0\376\22\346q\247\351\20eI\226"
-  "dI\226\14Q\232\203\0\377\23\346\361\3I\216dI\226dI\226d\321\220V\206\10\0\0\0\4\377"
-  "\377\0";
-
-// Ikona karty SD wyswietlana przy braku karty podczas startu
-static unsigned char sdcard[] PROGMEM = {
-  0xf0, 0xff, 0xff, 0x0f, 0xf8, 0xff, 0xff, 0x1f, 0xf8, 0xcf, 0xf3, 0x3f,
-  0x38, 0x49, 0x92, 0x3c, 0x38, 0x49, 0x92, 0x3c, 0x38, 0x49, 0x92, 0x3c,
-  0x38, 0x49, 0x92, 0x3c, 0x38, 0x49, 0x92, 0x3c, 0x38, 0x49, 0x92, 0x3c,
-  0x38, 0x49, 0x92, 0x3c, 0xf8, 0xff, 0xff, 0x3f, 0xf8, 0xff, 0xff, 0x3f,
-  0xf8, 0xff, 0xff, 0x3f, 0xf8, 0xff, 0xff, 0x3f, 0xf8, 0xff, 0xff, 0x3f,
-  0xfc, 0xff, 0xff, 0x3f, 0xfe, 0xff, 0xff, 0x3f, 0xff, 0xff, 0xff, 0x3f,
-  0xff, 0xff, 0xff, 0x3f, 0xff, 0xff, 0xff, 0x3f, 0xff, 0xff, 0xff, 0x3f,
-  0xfc, 0xff, 0xff, 0x3f, 0xfc, 0xc0, 0x80, 0x3f, 0x7c, 0xc0, 0x00, 0x3f,
-  0x3c, 0xc0, 0x00, 0x3e, 0x1c, 0xfc, 0x38, 0x3e, 0x1e, 0xfc, 0x78, 0x3c,
-  0x1f, 0xe0, 0x78, 0x3c, 0x3f, 0xc0, 0x78, 0x3c, 0x7f, 0x80, 0x78, 0x3c,
-  0xff, 0x87, 0x78, 0x3c, 0xff, 0x87, 0x38, 0x3e, 0x3f, 0x80, 0x00, 0x3e,
-  0x1f, 0xc0, 0x00, 0x3f, 0x3f, 0xe0, 0x80, 0x3f, 0xff, 0xff, 0xff, 0x3f,
-  0xff, 0xff, 0xff, 0x3f, 0xff, 0xff, 0xff, 0x3f, 0xfe, 0xff, 0xff, 0x1f,
-  0xfc, 0xff, 0xff, 0x0f 
-  };
 
 // Obrazek nutek wyswietlany przy starcie
 #define notes_width 256
 #define notes_height 46
-static unsigned char notes[] PROGMEM = {
-  0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x07, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x80, 0x0f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x0c, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0xc0, 0x0c, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x40, 0x0c, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0x0c, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x60, 0x0c, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x20, 0x0e, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x0e, 0x00,
-  0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x0e, 0x00, 0x02, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x20, 0x07, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xa0, 0x07, 0x00,
-  0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0xe0, 0x03, 0x80, 0x05, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00,
-  0x00, 0xf0, 0x01, 0xc0, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x60, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x40, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0xf8, 0x00, 0x40,
-  0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x78, 0x00, 0x08,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00,
-  0x00, 0x01, 0x00, 0x00, 0x00, 0x7c, 0x00, 0x40, 0x08, 0x00, 0x00, 0x00,
-  0x00, 0x60, 0x00, 0x00, 0x00, 0x5e, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00,
-  0x60, 0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00,
-  0x00, 0x5e, 0x00, 0x80, 0x08, 0x00, 0x00, 0x07, 0x00, 0xe0, 0x01, 0x00,
-  0xc0, 0x47, 0x00, 0x08, 0x00, 0x00, 0x07, 0x00, 0xe0, 0x01, 0x00, 0x00,
-  0x40, 0x00, 0x18, 0x00, 0x80, 0x00, 0x00, 0x0e, 0x00, 0x4e, 0x00, 0x00,
-  0x19, 0x00, 0xf0, 0x07, 0x00, 0x20, 0x01, 0x00, 0xf8, 0x41, 0x00, 0x18,
-  0x00, 0xf0, 0x07, 0x00, 0x20, 0x01, 0x00, 0x18, 0x40, 0x00, 0x78, 0x00,
-  0x80, 0x00, 0xe0, 0x0f, 0x00, 0x47, 0x00, 0x00, 0x10, 0x00, 0xf0, 0x07,
-  0x00, 0x20, 0x03, 0x00, 0x3c, 0x40, 0x00, 0x10, 0x00, 0xf0, 0x07, 0x00,
-  0x20, 0x03, 0x00, 0x1c, 0x40, 0x00, 0xe8, 0x00, 0x80, 0x00, 0xe0, 0x0f,
-  0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-  0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-  0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xc0, 0x41, 0x00, 0x00,
-  0x10, 0x00, 0x3f, 0x04, 0x00, 0xe0, 0x04, 0xe0, 0x11, 0x40, 0x00, 0x10,
-  0x00, 0x3f, 0x04, 0x00, 0xe0, 0x04, 0xe0, 0x11, 0x40, 0x00, 0x38, 0x01,
-  0x40, 0x00, 0x7e, 0x08, 0xc0, 0xe0, 0x0f, 0x00, 0x10, 0x00, 0x0f, 0x04,
-  0x00, 0xb0, 0x01, 0x78, 0x10, 0x40, 0x00, 0x10, 0x00, 0x0f, 0x04, 0x00,
-  0xb0, 0x01, 0x78, 0x10, 0x40, 0x00, 0x68, 0x01, 0x40, 0x00, 0x1e, 0x08,
-  0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-  0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-  0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x40, 0x70, 0x3e, 0x00,
-  0x1c, 0x00, 0x01, 0x04, 0x00, 0x10, 0x00, 0x0e, 0x10, 0x40, 0x00, 0x18,
-  0x00, 0x01, 0x04, 0x00, 0x10, 0x00, 0x0e, 0x10, 0x40, 0x00, 0xa8, 0x00,
-  0x2f, 0x00, 0x02, 0x08, 0x40, 0x98, 0x78, 0x00, 0x1f, 0x00, 0x01, 0x04,
-  0x00, 0x10, 0x00, 0x06, 0x10, 0x40, 0x00, 0x1f, 0x00, 0x01, 0x04, 0x00,
-  0x10, 0x00, 0x06, 0x10, 0x40, 0x00, 0x48, 0xc0, 0x1f, 0x00, 0x02, 0x08,
-  0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-  0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-  0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x40, 0x88, 0x70, 0x80,
-  0x0f, 0x00, 0x01, 0x04, 0x80, 0x17, 0x00, 0x02, 0x10, 0x7c, 0x80, 0x0f,
-  0x00, 0x01, 0x04, 0x80, 0x17, 0x00, 0x02, 0x10, 0x7c, 0x00, 0x08, 0x80,
-  0x0f, 0x00, 0x02, 0x08, 0x40, 0x88, 0x70, 0x00, 0x07, 0x00, 0x01, 0x04,
-  0xc0, 0x1f, 0x00, 0x02, 0x10, 0x7e, 0x00, 0x07, 0x00, 0x01, 0x04, 0xc0,
-  0x1f, 0x00, 0x02, 0x10, 0x7e, 0x80, 0x0f, 0x00, 0x00, 0x00, 0x02, 0x08,
-  0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-  0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-  0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xc0, 0x00, 0x71, 0x00,
-  0x00, 0x00, 0xc1, 0x07, 0xe0, 0x07, 0x00, 0x02, 0x1e, 0x00, 0x00, 0x00,
-  0x00, 0xc1, 0x07, 0xe0, 0x07, 0x00, 0x02, 0x1e, 0x00, 0xc0, 0x07, 0x00,
-  0x00, 0x00, 0x82, 0x0f, 0x80, 0x01, 0x39, 0x00, 0x00, 0x00, 0xe1, 0x07,
-  0xc0, 0x03, 0x00, 0x02, 0x1f, 0x00, 0x00, 0x00, 0x00, 0xe1, 0x07, 0xc0,
-  0x03, 0x00, 0x02, 0x1f, 0x00, 0x80, 0x03, 0x00, 0x00, 0x00, 0xc2, 0x0f,
-  0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-  0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-  0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x0f, 0x1e, 0x00,
-  0x00, 0xf0, 0x81, 0x03, 0x00, 0x00, 0x80, 0x03, 0x0e, 0x00, 0x00, 0x00,
-  0xf0, 0x81, 0x03, 0x00, 0x00, 0x80, 0x03, 0x0e, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0xe0, 0x03, 0x07, 0x00, 0xfc, 0x0f, 0x00, 0x00, 0xf8, 0x01, 0x00,
-  0x00, 0x00, 0xc0, 0x03, 0x00, 0x00, 0x00, 0x00, 0xf8, 0x01, 0x00, 0x00,
-  0x00, 0xc0, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x03, 0x00,
-  0x00, 0xf0, 0x03, 0x00, 0x00, 0xf8, 0x00, 0x00, 0x00, 0x00, 0xe0, 0x03,
-  0x00, 0x00, 0x00, 0x00, 0xf8, 0x00, 0x00, 0x00, 0x00, 0xe0, 0x03, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x01, 0x00, 0x00, 0x00, 0x02, 0x00,
-  0x00, 0x70, 0x00, 0x00, 0x00, 0x00, 0xe0, 0x01, 0x00, 0x00, 0x00, 0x00,
-  0x70, 0x00, 0x00, 0x00, 0x00, 0xe0, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0xe0, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0xc0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0xc0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x0c, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0e, 0x02, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x0e, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x0c, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0c, 0x01, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0xf8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x60, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
-};
 
 // Funkcja odwracania bitów MSL-LSB <-> LSB-MSB
 uint32_t reverse_bits(uint32_t inval, int bits)
@@ -1599,8 +716,11 @@ void saveStationToPSRAM(const char *station)
       // Zwiększ licznik zapisanych stacji.
       stationsCount++;
 
-      u8g2.setFont(spleen6x12PL);  // progress bar pobieranych stacji
-      u8g2.drawStr(21, 36, "Progress:");
+      u8g2.setFont(u8g2_font_wqy12_t_chinese1);  
+      u8g2.setCursor(21, 36);  
+      u8g2.println("进度:");  
+      // u8g2.setFont(spleen6x12PL);  // progress bar pobieranych stacji
+      // u8g2.drawStr(21, 36, "Progress:");
       u8g2.drawStr(75, 36, String(stationsCount).c_str());  // Napisz licznik pobranych stacji
 
       u8g2.drawRFrame(21, 42, 212, 12, 3);  // Ramka paska postępu ladowania stacji stacji w>8 h>8
@@ -1701,10 +821,11 @@ void readSDStations() {
 void fetchStationsFromServer() 
 {
   displayActive = true;
-  u8g2.setFont(spleen6x12PL);
+  // u8g2.setFont(spleen6x12PL);
+  u8g2.setFont(u8g2_font_wqy12_t_chinese1); 
   u8g2.clearBuffer();
   u8g2.setCursor(21, 23);
-  u8g2.print("Loading BANK:" + String(bank_nr) + " stations from:");
+  u8g2.print("加载 BANK:" + String(bank_nr) + " 从:");
   u8g2.sendBuffer();
   
   currentSelection = 0;
@@ -1783,8 +904,10 @@ void fetchStationsFromServer()
   if (SD.exists(fileName) && bankNetworkUpdate == false) 
   {
     Serial.println("Plik banku " + fileName + " już istnieje.");
-    u8g2.setFont(spleen6x12PL);
+    // u8g2.setFont(spleen6x12PL);
+    u8g2.setFont(u8g2_font_wqy12_t_chinese1);
     //u8g2.drawStr(147, 23, "SD card");
+    u8g2.setCursor(147, 23);
     u8g2.print("SD CARD");
     u8g2.sendBuffer();
     readSDStations();  // Jesli plik istnieje to odczytujemy go tylko z karty
@@ -2004,12 +1127,14 @@ void displayRadio()
     u8g2.clearBuffer();
     //u8g2.setFont(u8g2_font_fub14_tf);
     //u8g2.setFont(u8g2_font_luRS14_tf);
-    u8g2.setFont(u8g2_font_helvB14_tr);
+    // u8g2.setFont(u8g2_font_helvB14_tr);
+    u8g2.setFont(u8g2_font_wqy14_t_chinese1);  // Ustawiamy czcionkę dla wyświetlacza
     u8g2.drawStr(24, 16, stationName.substring(0, stationNameLenghtCut - 1).c_str());
     u8g2.drawRBox(1, 1, 21, 16, 4);  // Rbox pod numerem stacji
     
     // Funkcja wyswietlania numeru Banku na dole ekranu
-    u8g2.setFont(spleen6x12PL);
+    // u8g2.setFont(spleen6x12PL);
+    u8g2.setFont(u8g2_font_wqy12_t_chinese1);
     char BankStr[8];  
     snprintf(BankStr, sizeof(BankStr), "Bank%02d", bank_nr); // Formatujemy numer banku do postacji 00
 
@@ -2030,7 +1155,8 @@ void displayRadio()
     u8g2.print(StationNrStr);
     u8g2.setDrawColor(1);
     
-    u8g2.setFont(spleen6x12PL);
+    // u8g2.setFont(spleen6x12PL);
+    u8g2.setFont(u8g2_font_wqy12_t_chinese1);
         
     stationStringFormatting(); //Formatujemy stationString wyswietlany przez funkcję Scrollera
 
@@ -2043,14 +1169,18 @@ void displayRadio()
     SampleRate = SampleRate / 1000;
     
     String displayString = String(SampleRate) + "." + String(SampleRateRest) + "kHz " + bitsPerSampleString + "bit " + bitrateString + "kbps";
-    u8g2.setFont(spleen6x12PL);
-    u8g2.drawStr(0, 63, displayString.c_str());
+    // u8g2.setFont(spleen6x12PL);
+    u8g2.setFont(u8g2_font_wqy12_t_chinese1);
+    u8g2.setCursor(0, 63); 
+    u8g2.print(displayString.c_str());  // Wyswietlamy informacje o bitrate, sample rate i bits per sample
+    // u8g2.drawStr(0, 63, displayString.c_str());
   }
   else if (displayMode == 1) // Tryb wświetlania zegara z 1 linijką radia na dole
   {
     u8g2.clearBuffer();
     u8g2.setDrawColor(1);
-    u8g2.setFont(spleen6x12PL);
+    // u8g2.setFont(spleen6x12PL);
+    u8g2.setFont(u8g2_font_wqy12_t_chinese1);
     u8g2.drawLine(0, 50, 255, 50); // Linia separacyjna zegar, dolna linijka radia
 
     stationStringFormatting(); //Formatujemy stationString wyswietlany przez funkcję Scrollera
@@ -2059,8 +1189,11 @@ void displayRadio()
   else if (displayMode == 2) // Tryb wświetlania mode 2 - 3 linijki tekstu
   {
     u8g2.clearBuffer();
-    u8g2.setFont(spleen6x12PL);
-    u8g2.drawStr(24, 11, stationName.substring(0, stationNameLenghtCut).c_str()); // Przyciecie i wyswietlenie dzieki temu nie zmieniamy zawartosci zmiennej stationName
+    // u8g2.setFont(spleen6x12PL);
+    u8g2.setFont(u8g2_font_wqy12_t_chinese1);
+    u8g2.setCursor(24, 16);  
+    u8g2.print(stationName.substring(0, stationNameLenghtCut - 1).c_str()); // Wyświetlamy nazwę stacji z przycięciem do 42 znaków
+    // u8g2.drawStr(24, 11, stationName.substring(0, stationNameLenghtCut).c_str()); // Przyciecie i wyswietlenie dzieki temu nie zmieniamy zawartosci zmiennej stationName
     u8g2.drawRBox(1, 1, 18, 13, 4);  // Rbox pod numerem stacji
     
     // Funkcja wyswietlania numeru Banku na dole ekranu
@@ -2092,7 +1225,7 @@ void displayRadio()
     SampleRate = SampleRate / 1000;     
     
     String displayString = String(SampleRate) + "." + String(SampleRateRest) + "kHz " + bitsPerSampleString + "bit " + bitrateString + "kbps";
-    u8g2.setFont(spleen6x12PL);
+    u8g2.setFont(u8g2_font_spleen6x12_mr);
     u8g2.drawStr(0, 63, displayString.c_str());  
   }
   else if (displayMode == 3) // Tryb wświetlania mode 3 - linijka statusu (stacja, bank godzina) na gorze i na dole (format stream, wifi zasieg)
@@ -2103,7 +1236,8 @@ void displayRadio()
     u8g2.drawRBox(1, 1, 21, 16, 4);  // Rbox pod numerem stacji
     
     // Funkcja wyswietlania numeru Banku na dole ekranu
-    u8g2.setFont(spleen6x12PL);
+    // u8g2.setFont(spleen6x12PL);
+    u8g2.setFont(u8g2_font_wqy12_t_chinese1);
     char BankStr[8];  
     snprintf(BankStr, sizeof(BankStr), "Bank%02d", bank_nr); // Formatujemy numer banku do postacji 00
 
@@ -2115,14 +1249,16 @@ void displayRadio()
 
 
     u8g2.setDrawColor(0);
-    u8g2.setFont(u8g2_font_spleen8x16_mr);
+    // u8g2.setFont(u8g2_font_spleen8x16_mr);
+    u8g2.setFont(u8g2_font_wqy16_t_chinese1);
     char StationNrStr[3];
     snprintf(StationNrStr, sizeof(StationNrStr), "%02d", station_nr);  //Formatowanie informacji o stacji i banku do postaci 00
     u8g2.setCursor(4, 14);                                            // Pozycja numeru stacji na gorze po lewej ekranu
     u8g2.print(StationNrStr);
     u8g2.setDrawColor(1);
     
-    u8g2.setFont(spleen6x12PL);
+    // u8g2.setFont(spleen6x12PL);
+    u8g2.setFont(u8g2_font_wqy12_t_chinese1);
         
     stationStringFormatting(); //Formatujemy stationString wyswietlany przez funkcję Scrollera
 
@@ -2273,10 +1409,21 @@ void encoderFunctionOrderChange()
   bankMenuEnable = false;
   encoderFunctionOrder = !encoderFunctionOrder;
   u8g2.clearBuffer();
-  u8g2.setFont(spleen6x12PL);
-  u8g2.drawStr(1,14,"Encoder function order change:");
-  if (encoderFunctionOrder == false) {u8g2.drawStr(1,28,"Rotate for volume, press for station list");}
-  if (encoderFunctionOrder == true ) {u8g2.drawStr(1,28,"Rotate for station list, press for volume");}
+  // u8g2.setFont(spleen6x12PL);
+  u8g2.setFont(u8g2_font_wqy12_t_chinese1);
+  u8g2.setCursor(1, 14);
+  u8g2.print("编码器功能顺序变更");
+  // u8g2.drawStr(1,14,"Encoder function order change:");
+  if (encoderFunctionOrder == false) {
+    u8g2.setCursor(1, 28);
+    u8g2.print("旋转音量，按下电台列表");
+    // u8g2.drawStr(1,28,"Rotate for volume, press for station list");
+  }
+  if (encoderFunctionOrder == true ) {
+    u8g2.setCursor(1, 28);
+    u8g2.print("旋转电台列表，按下音量");
+    // u8g2.drawStr(1,28,"Rotate for station list, press for volume");
+  }
   u8g2.sendBuffer();
 }
 
@@ -2298,7 +1445,8 @@ void bankMenuDisplay()
   u8g2.drawStr(145, 33, String(bank_nr).c_str());  // numer banku
   if ((bankNetworkUpdate == true) || (noSDcard == true))
   {
-    u8g2.setFont(spleen6x12PL);
+    // u8g2.setFont(spleen6x12PL);
+    u8g2.setFont(u8g2_font_wqy12_t_chinese1);
     u8g2.drawStr(185, 24, "NETWORK ");
     u8g2.drawStr(188, 34, "UPDATE  ");
     
@@ -2354,7 +1502,8 @@ void handleButtons() {
       {
         //encoderFunctionOrderChange();
         
-        u8g2.setFont(spleen6x12PL);
+        // u8g2.setFont(spleen6x12PL);
+        u8g2.setFont(u8g2_font_spleen6x12_mr);
         u8g2.clearBuffer();
         displayActive = true;
         displayStartTime = millis();
@@ -2662,12 +1811,14 @@ void rcInputKey(uint8_t i)
     for (int j = 0; j < min(length, STATION_NAME_LENGTH); j++) { // Odczytaj nazwę stacji z PSRAM jako ciąg bajtów, maksymalnie do STATION_NAME_LENGTH
       station[j] = psramData[(station_nr - 1) * (STATION_NAME_LENGTH + 1) + 1 + j];  // Odczytaj znak po znaku nazwę stacji
     }
-    u8g2.setFont(spleen6x12PL);
+    // u8g2.setFont(spleen6x12PL);
+    u8g2.setFont(u8g2_font_wqy12_t_chinese1); 
     String stationNameText = String(station);
     stationNameText = stationNameText.substring(0, 25); // Przycinamy do 23 znakow
 
     u8g2.drawLine(0,48,256,48);
-    u8g2.setFont(spleen6x12PL);
+    // u8g2.setFont(spleen6x12PL);
+    u8g2.setFont(u8g2_font_wqy12_t_chinese1); 
     u8g2.setCursor(0, 60);
     u8g2.print("Bank:" + String(bank_nr) + ", 1-" + String(stationsCount) + "     " + stationNameText);
     u8g2.sendBuffer();
@@ -2761,8 +1912,11 @@ void saveStationOnSD()
 void changeStation2() 
 {
   u8g2.clearBuffer();
-  u8g2.setFont(u8g2_font_fub14_tf); // cziocnka 14x11
-  u8g2.drawStr(34, 33, "Loading stream..."); // 8 znakow  x 11 szer
+  u8g2.setFont(u8g2_font_wqy14_t_chinese1); 
+  u8g2.setCursor(34, 33);
+  u8g2.print("正在加载流..."); // "Loading stream..."
+  // u8g2.setFont(u8g2_font_fub14_tf); // cziocnka 14x11
+  // u8g2.drawStr(34, 33, "Loading stream..."); // 8 znakow  x 11 szer
   u8g2.sendBuffer();
 
   mp3 = flac = aac = vorbis = false;
@@ -2825,8 +1979,11 @@ void changeStation2()
     Serial.print("Link do stacji: ");
     Serial.println(stationUrl);
     
-    u8g2.setFont(spleen6x12PL);  // wypisujemy jaki stream jakie stacji jest ładowany
-    u8g2.drawStr(34, 55, String(stationName.substring(0, stationNameLenghtCut)).c_str());
+    // u8g2.setFont(spleen6x12PL);  // wypisujemy jaki stream jakie stacji jest ładowany
+    u8g2.setFont(u8g2_font_wqy12_t_chinese1);  // wypisujemy jaki stream jakie stacji jest ładowany
+    u8g2.setCursor(34, 55);
+    u8g2.print(String(stationName.substring(0, stationNameLenghtCut)).c_str()); // Przycinamy nazwę stacji do 25 znaków
+    // u8g2.drawStr(34, 55, String(stationName.substring(0, stationNameLenghtCut)).c_str());
     u8g2.sendBuffer();
     
     // Połącz z daną stacją
@@ -2855,8 +2012,11 @@ void changeStation()
 {
   fwupd = false;
   u8g2.clearBuffer();
-  u8g2.setFont(u8g2_font_fub14_tf); // cziocnka 14x11
-  u8g2.drawStr(34, 33, "Loading stream..."); // 8 znakow  x 11 szer
+  // u8g2.setFont(u8g2_font_fub14_tf); // cziocnka 14x11
+  u8g2.setFont(u8g2_font_wqy14_t_chinese1); // cziocnka 14x11
+  u8g2.setCursor(34, 33);
+  u8g2.print("正在加载流..."); // "Loading stream..."
+  // u8g2.drawStr(34, 33, "Loading stream..."); // 8 znakow  x 11 szer
   u8g2.sendBuffer();
 
   mp3 = flac = aac = vorbis = false;
@@ -2922,8 +2082,11 @@ void changeStation()
     Serial.print("Link do stacji: ");
     Serial.println(stationUrl);
     
-    u8g2.setFont(spleen6x12PL);  // wypisujemy jaki stream jakie stacji jest ładowany
-    u8g2.drawStr(34, 55, String(stationName.substring(0, stationNameLenghtCut)).c_str());
+    // u8g2.setFont(spleen6x12PL);  // wypisujemy jaki stream jakie stacji jest ładowany
+    u8g2.setFont(u8g2_font_wqy12_t_chinese1);  // wypisujemy jaki stream jakie stacji jest ładowany
+    u8g2.setCursor(34, 55);
+    u8g2.print(String(stationName.substring(0, stationNameLenghtCut)).c_str()); // Przycinamy nazwę stacji do 25 znaków
+    // u8g2.drawStr(34, 55, String(stationName.substring(0, stationNameLenghtCut)).c_str());
     u8g2.sendBuffer();
     
     // Połącz z daną stacją
@@ -2952,7 +2115,9 @@ void displayStations()
 {
   listedStations = true;
   u8g2.clearBuffer();  // Wyczyść bufor przed rysowaniem, aby przygotować ekran do nowej zawartości
-  u8g2.setFont(spleen6x12PL);
+  // u8g2.setFont(spleen6x12PL);
+  u8g2.setFont(u8g2_font_wqy12_t_chinese1); // Ustaw czcionkę do wyświetlania tekstu
+
   u8g2.setCursor(20, 10);                                          // Ustaw pozycję kursora (x=60, y=10) dla nagłówka
   u8g2.print("BANK: " + String(bank_nr));                                          // Wyświetl nagłówek "BANK:"
   u8g2.setCursor(68, 10);                                          // Ustaw pozycję kursora (x=60, y=10) dla nagłówka
@@ -3080,9 +2245,12 @@ void updateTimer()
         //snprintf(timeString, sizeof(timeString), "%2d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
         if (showDots) snprintf(timeString, sizeof(timeString), "%2d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
         else snprintf(timeString, sizeof(timeString), "%2d %02d", timeinfo.tm_hour, timeinfo.tm_min);
-        u8g2.setFont(spleen6x12PL);
+        // u8g2.setFont(spleen6x12PL);
+        u8g2.setFont(u8g2_font_wqy12_t_chinese1); // Ustaw czcionkę do wyświetlania tekstu
+        u8g2.setCursor(0, 63); // Ustaw kursor na pozycji (x=0, y=63) dla wyświetlania czasu
+        u8g2.print(timeString); // Wyświetl czas w formacie "HH:MM"
         //u8g2.drawStr(208, 63, timeString);
-        u8g2.drawStr(226, 63, timeString);
+        // u8g2.drawStr(226, 63, timeString);
       }
       else if (displayMode == 1)
       {
@@ -3100,49 +2268,59 @@ void updateTimer()
 
         String month = "";
         switch (timeinfo.tm_mon) {
-        case 0: month = "JAN"; break;     
-        case 1: month = "FEB"; break;     
-        case 2: month = "MAR"; break;
-        case 3: month = "APR"; break;
-        case 4: month = "MAY"; break;
-        case 5: month = "JUN"; break;
-        case 6: month = "JUL"; break;
-        case 7: month = "AUG"; break;
-        case 8: month = "SEP"; break;
-        case 9: month = "OCT"; break;
-        case 10: month = "NOV"; break;
-        case 11: month = "DEC"; break;                                
+        case 0: month = " 1月"; break;     
+        case 1: month = " 2月"; break;     
+        case 2: month = " 3月"; break;
+        case 3: month = " 4月"; break;
+        case 4: month = " 5月"; break;
+        case 5: month = " 6月"; break;
+        case 6: month = " 7月"; break;
+        case 7: month = " 8月"; break;
+        case 8: month = " 9月"; break;
+        case 9: month = "10月"; break;
+        case 10: month = "11月"; break;
+        case 11: month = "12月"; break;                                
         }
-        u8g2.setFont(spleen6x12PL);
-        u8g2.drawStr(232,14, month.c_str());
+        // u8g2.setFont(spleen6x12PL);
+        u8g2.setFont(u8g2_font_wqy12_t_chinese1); // Ustaw czcionkę do wyświetlania tekstu
+        u8g2.setCursor(232, 14); // Ustaw kursor na
+        u8g2.print(month.c_str()); // Wyświetl miesiąc w formacie "MMM"
+        // u8g2.drawStr(232,14, month.c_str());
 
         String dayOfWeek = "";
         switch (timeinfo.tm_wday) {
-        case 0: dayOfWeek = " Sunday  "; break;     
-        case 1: dayOfWeek = " Monday  "; break;     
-        case 2: dayOfWeek = " Tuesday "; break;
-        case 3: dayOfWeek = "Wednesday"; break;
-        case 4: dayOfWeek = "Thursday "; break;
-        case 5: dayOfWeek = " Friday  "; break;
-        case 6: dayOfWeek = "Saturday "; break;
+        case 0: dayOfWeek = " 周日  "; break;     
+        case 1: dayOfWeek = " 周一  "; break;     
+        case 2: dayOfWeek = " 周二  "; break;
+        case 3: dayOfWeek = " 周三  "; break;
+        case 4: dayOfWeek = " 周四  "; break;
+        case 5: dayOfWeek = " 周五  "; break;
+        case 6: dayOfWeek = " 周六  "; break;
         }
         
         u8g2.drawRBox(198,20,58,15,3);  // Box z zaokraglonymi rogami, biały pod dniem tygodnia
         u8g2.drawLine(198,20,256,20); // Linia separacyjna dzien miesiac / dzien tygodnia
         u8g2.setDrawColor(0);
-        u8g2.drawStr(201,31, dayOfWeek.c_str());
+        u8g2.setCursor(201, 31); // Ustaw kursor na pozycji (x=201, y=31) dla wyświetlania dnia tygodnia
+        u8g2.print(dayOfWeek.c_str()); // Wyświetl dzień tygod
+        // u8g2.drawStr(201,31, dayOfWeek.c_str());
         u8g2.setDrawColor(1);
         u8g2.drawRFrame(198,0,58,35,3); // Ramka na całosci kalendarza
 
         snprintf(timeString, sizeof(timeString), ":%02d", timeinfo.tm_sec);
-        u8g2.drawStr(xtime+163, 45, timeString);
+        u8g2.setCursor(xtime+163, 45); // Ustaw kursor na pozycji (x=xtime+163, y=45) dla wyświetlania sekund
+        u8g2.print(timeString); // Wyświetl sekundy w formacie ":SS"
+        // u8g2.drawStr(xtime+163, 45, timeString);
       }
       else if (displayMode == 3)
       { 
         if (showDots) snprintf(timeString, sizeof(timeString), "%2d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
         else snprintf(timeString, sizeof(timeString), "%2d %02d", timeinfo.tm_hour, timeinfo.tm_min);
-        u8g2.setFont(spleen6x12PL);
-        u8g2.drawStr(208, 63, timeString);
+        // u8g2.setFont(spleen6x12PL);
+        u8g2.setFont(u8g2_font_wqy12_t_chinese1); // Ustaw czcionkę do wyświetlania tekstu
+        u8g2.setCursor(208, 63); // Ustaw kursor na
+        u8g2.print(timeString); // Wyświetl czas w formacie "HH:MM"
+        // u8g2.drawStr(208, 63, timeString);
       }
 
       //u8g2.sendBuffer(); // nie piszemy po ekranie w tej funkcji tylko przygotowujemy bufor. Nie mozna pisac podczas pracy scrollera
@@ -3164,18 +2342,30 @@ void updateTimer()
       //snprintf(timeString, sizeof(timeString), "%02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
       if (showDots) snprintf(timeString, sizeof(timeString), "%2d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
       else snprintf(timeString, sizeof(timeString), "%2d %02d", timeinfo.tm_hour, timeinfo.tm_min);
-      u8g2.setFont(spleen6x12PL);
+      // u8g2.setFont(spleen6x12PL);
+      u8g2.setFont(u8g2_font_6x12_mn); // Ustaw czcionkę do wyświetlania tekstu
       
       if ((displayMode == 0) || (displayMode == 2)) { u8g2.drawStr(0, 63, "                         ");}
       if (displayMode == 1) { u8g2.drawStr(0, 33, "                         ");}
 
+      u8g2.setFont(u8g2_font_wqy12_t_chinese1); // Ustaw czcionkę do wyświetlania tekstu
       if (millis() - lastCheckTime >= 1000)
       {
-        if ((displayMode == 0) || (displayMode == 2)) { u8g2.drawStr(0, 63, "... No audio stream ! ...");}
-        if (displayMode == 1) { u8g2.drawStr(0, 33, "... No audio stream ! ...");}
+        if ((displayMode == 0) || (displayMode == 2)) { 
+          u8g2.setCursor(0, 63); 
+          u8g2.print("... 没有音频流 ! ..."); 
+          // u8g2.drawStr(0, 63, "... No audio stream ! ...");
+        }
+        if (displayMode == 1) { 
+          u8g2.setCursor(0, 33); 
+          u8g2.print("... 没有音频流 ! ..."); 
+          // u8g2.drawStr(0, 33, "... No audio stream ! ...");
+        }
         lastCheckTime = millis(); // Zaktualizuj czas ostatniego sprawdzenia
-      }       
-      u8g2.drawStr(226, 63, timeString);
+      }
+      u8g2.setCursor(226, 63); 
+      u8g2.print(timeString); 
+      // u8g2.drawStr(226, 63, timeString);
 
     }
   }
@@ -3184,8 +2374,11 @@ void updateTimer()
 void saveEqualizerOnSD() 
 {
   u8g2.clearBuffer();
-  u8g2.setFont(u8g2_font_fub14_tf); // cziocnka 14x11
-  u8g2.drawStr(1, 33, "Saving equalizer settings"); // 8 znakow  x 11 szer
+  // u8g2.setFont(u8g2_font_fub14_tf); // cziocnka 14x11
+  // u8g2.drawStr(1, 33, "Saving equalizer settings"); // 8 znakow  x 11 szer
+  u8g2.setFont(u8g2_font_wqy14_t_chinese1); // cziocnka 14x11
+  u8g2.setCursor(1, 33);
+  u8g2.print("正在保存均衡器设置"); // "Saving equalizer
   u8g2.sendBuffer();
   
   
@@ -3586,8 +2779,11 @@ void displayClearUnderScroller() // Funkcja odpwoiedzialna za przewijanie inform
   if (displayMode == 0) // Tryb normalny Mode 0- radio
   {
     u8g2.setDrawColor(1);
-    u8g2.setFont(spleen6x12PL);
-    u8g2.drawStr(0,yPositionDisplayScrollerMode0, "                                           "); //43 spacje - czyszczenie ekranu   
+    // u8g2.setFont(spleen6x12PL);
+    // u8g2.drawStr(0,yPositionDisplayScrollerMode0, "                                           "); //43 spacje - czyszczenie ekranu   
+    u8g2.setFont(u8g2_font_spleen6x12_mr); 
+    u8g2.setCursor(0, yPositionDisplayScrollerMode0); 
+    u8g2.print("                                           "); 
     //u8g2.setDrawColor(0);
     //u8g2.drawBox(0,yPositionDisplayScrollerMode0,255,12);
     //u8g2.setDrawColor(1);
@@ -3599,7 +2795,7 @@ void displayClearUnderScroller() // Funkcja odpwoiedzialna za przewijanie inform
   else if (displayMode == 2)  // Tryb mały tekst - Mode 2
   {
     u8g2.setDrawColor(1);
-    u8g2.setFont(spleen6x12PL);   
+    u8g2.setFont(u8g2_font_spleen6x12_mr); 
     u8g2.drawStr(0,yPositionDisplayScrollerMode2, "                                           "); //43 znaki czyszczenie ekranu
     u8g2.drawStr(0,yPositionDisplayScrollerMode2 + 12, "                                           "); //43 znaki czyszczenie ekranu
     u8g2.drawStr(0,yPositionDisplayScrollerMode2 + 12 + 12, "                                           "); //43 znaki czyszczenie ekranu
@@ -3626,7 +2822,7 @@ void displayRadioScroller() // Funkcja odpwoiedzialna za przewijanie informacji 
     if (stationStringScroll.length() > maxStationVisibleStringScrollLength) //42 + 4 znaki spacji separatora. Realnie widzimy 42 znaki
     {    
       xPositionStationString = offset;
-      u8g2.setFont(spleen6x12PL);
+      u8g2.setFont(u8g2_font_spleen6x12_mr); 
       u8g2.setDrawColor(1);
       do {
         u8g2.drawStr(xPositionStationString, yPositionDisplayScrollerMode0, stationStringScroll.c_str());
@@ -3641,7 +2837,7 @@ void displayRadioScroller() // Funkcja odpwoiedzialna za przewijanie informacji 
     } else {
       xPositionStationString = 0;
       u8g2.setDrawColor(1);
-      u8g2.setFont(spleen6x12PL);    
+      u8g2.setFont(u8g2_font_spleen6x12_mr); 
       u8g2.drawStr(xPositionStationString, yPositionDisplayScrollerMode0, stationStringScroll.c_str());
       
     }
@@ -3652,7 +2848,7 @@ void displayRadioScroller() // Funkcja odpwoiedzialna za przewijanie informacji 
     if (stationStringScroll.length() > maxStationVisibleStringScrollLength) 
     {     
       xPositionStationString = offset;
-      u8g2.setFont(spleen6x12PL);
+      u8g2.setFont(u8g2_font_spleen6x12_mr); 
       u8g2.setDrawColor(1);
       do {
         u8g2.drawStr(xPositionStationString, yPositionDisplayScrollerMode1, stationStringScroll.c_str());
@@ -3670,7 +2866,7 @@ void displayRadioScroller() // Funkcja odpwoiedzialna za przewijanie informacji 
     {
       xPositionStationString = 0;
       u8g2.setDrawColor(1);
-      u8g2.setFont(spleen6x12PL);       
+      u8g2.setFont(u8g2_font_spleen6x12_mr); 
       u8g2.drawStr(xPositionStationString, yPositionDisplayScrollerMode1, stationStringScroll.c_str());
     }
 
@@ -3710,7 +2906,7 @@ void displayRadioScroller() // Funkcja odpwoiedzialna za przewijanie informacji 
         else
         {
           // Jeśli słowo nie pasuje, wyświetl bieżącą linię i przejdź do nowej linii
-          u8g2.setFont(spleen6x12PL);
+          u8g2.setFont(u8g2_font_spleen6x12_mr); 
           u8g2.drawStr(0, yPosition, currentLine.c_str());
           yPosition += 12;  // Przesunięcie w dół dla kolejnej linii
           // Zresetuj bieżącą linię i dodaj nowe słowo
@@ -3721,7 +2917,7 @@ void displayRadioScroller() // Funkcja odpwoiedzialna za przewijanie informacji 
     // Wyświetl ostatnią linię, jeśli coś zostało
     if (currentLine.length() > 0)
     {
-      u8g2.setFont(spleen6x12PL);
+      u8g2.setFont(u8g2_font_spleen6x12_mr); 
       u8g2.drawStr(0, yPosition, currentLine.c_str());
     }
   }
@@ -4202,7 +3398,7 @@ void displayEqualizer() // Funkcja rysująca menu 3-punktowego equalizera
   u8g2.setFont(u8g2_font_fub14_tf);
   u8g2.drawStr(60, 14, "EQUALIZER");
   //u8g2.drawStr(1, 14, "EQUALIZER");
-  u8g2.setFont(spleen6x12PL);
+  u8g2.setFont(u8g2_font_spleen6x12_mr);
   //u8g2.setCursor(138,12);
   //u8g2.print("P1    P2    P3    P4");
   uint8_t xTone;
@@ -4300,7 +3496,7 @@ void displayBasicInfo()
   timeDisplay = false;          // Wyłaczamy zegar
   displayActive = true;         // Wyswietlacz aktywny
   u8g2.clearBuffer();
-  u8g2.setFont(spleen6x12PL);
+  u8g2.setFont(u8g2_font_spleen6x12_mr);
   u8g2.drawStr(0, 10, "Info:");
   u8g2.setCursor(0,25); u8g2.print("ESP32 SN:" + String(ESP.getEfuseMac()) + ",  FW Ver.:" + String(softwareRev));
   u8g2.setCursor(0,38); u8g2.print("Hostname:" + String(hostname) + ",  WiFi Signal:" + String(WiFi.RSSI()) + "dBm");
@@ -4338,7 +3534,7 @@ void recoveryModeCheck()
   {
     int8_t recoveryMode = 0;
     u8g2.clearBuffer();
-    u8g2.setFont(spleen6x12PL);
+    u8g2.setFont(u8g2_font_spleen6x12_mr);
     u8g2.drawStr(1,14, "RECOVERY / RESET MODE - release encoder");
     u8g2.sendBuffer();
     delay(2000);
@@ -4767,7 +3963,7 @@ void drawSwitch(uint8_t x, uint8_t y, bool state) // Ikona przełacznika szeroka
   {
     u8g2.drawRBox(x, y, 11, 10, 3);  
   }
-  u8g2.setFont(spleen6x12PL); // Przywracamy podstawową czcionkę
+  u8g2.setFont(u8g2_font_spleen6x12_mr); // Przywracamy podstawową czcionkę
 }
 
 void displayConfig()
@@ -4777,7 +3973,7 @@ void displayConfig()
   timeDisplay = false;          // Wyłaczamy zegar
   displayActive = true;         // Wyswietlacz aktywny
   
-  u8g2.setFont(spleen6x12PL);
+  u8g2.setFont(u8g2_font_spleen6x12_mr);
   
   // Strona 1
   u8g2.clearBuffer();
@@ -5176,9 +4372,13 @@ void webUrlStationPlay()
   audio.stopSong();
 
   u8g2.clearBuffer();
-  u8g2.setFont(u8g2_font_fub14_tf); // cziocnka 14x11
-  u8g2.drawStr(34, 33, "Loading stream..."); // 8 znakow  x 11 szer
+  u8g2.setFont(u8g2_font_wqy12_t_chinese1); // ustawiamy czcionke
+  u8g2.setCursor(34, 33);
+  u8g2.print("正在加载流..."); // 8 znakow  x 11 szer
   u8g2.sendBuffer();
+  // u8g2.setFont(u8g2_font_fub14_tf); // cziocnka 14x11
+  // u8g2.drawStr(34, 33, "Loading stream..."); // 8 znakow  x 11 szer
+  // u8g2.sendBuffer();
 
   mp3 = flac = aac = vorbis = false;
     
@@ -5207,10 +4407,13 @@ void webUrlStationPlay()
     Serial.print("Link do stacji: ");
     Serial.println(url2play);
     
-    u8g2.setFont(spleen6x12PL);  // wypisujemy jaki stream jakie stacji jest ładowany
-    u8g2.drawStr(34, 55, String(url2play).c_str());
+    // u8g2.setFont(u8g2_font_spleen6x12_mr);  // wypisujemy jaki stream jakie stacji jest ładowany
+    // u8g2.drawStr(34, 55, String(url2play).c_str());
+    u8g2.setFont(u8g2_font_wqy12_t_chinese1);
+    u8g2.setCursor(34, 55);
+    u8g2.print(String(url2play).c_str());
     u8g2.sendBuffer();
-    
+
     station_nr = 0;
     bank_nr = 0;
     //stationName = "Remote URL";
@@ -5734,7 +4937,7 @@ void setup()
   u8g2.drawXBMP(0, 5, notes_width, notes_height, notes);  // obrazek - nutki
   u8g2.setFont(u8g2_font_fub14_tf);
   u8g2.drawStr(58, 17, "Internet Radio");
-  u8g2.setFont(spleen6x12PL);
+  u8g2.setFont(u8g2_font_spleen6x12_mr);
   //u8g2.drawStr(226, 62, softwareRev);
   u8g2.drawStr(208, 62, softwareRev);
   u8g2.sendBuffer();
@@ -5746,8 +4949,11 @@ void setup()
     // Informacja na wyswietlaczu o problemach lub braku karty SD
     Serial.println("Błąd inicjalizacji karty SD!");
     //u8g2.clearBuffer();
-    u8g2.setFont(spleen6x12PL);
-    u8g2.drawStr(5, 62, "Error - Please check SD card");
+    // u8g2.setFont(spleen6x12PL);
+    // u8g2.drawStr(5, 62, "Error - Please check SD card");
+    u8g2.setFont(u8g2_font_wqy12_t_gb2312);
+    u8g2.setCursor(5, 62);
+    u8g2.print("错误 - 请检查SD卡");
     u8g2.setDrawColor(0);
     u8g2.drawBox(212, 0, 44, 45);
     u8g2.setDrawColor(1);
@@ -5770,8 +4976,11 @@ void setup()
 
   //u8g2.drawStr(5, 32, "Internet Radio");
   //u8g2.sendBuffer();
-  u8g2.setFont(spleen6x12PL);
-  u8g2.drawStr(5, 62, "Connecting to network...    ");
+  u8g2.setFont(u8g2_font_wqy12_t_gb2312);
+  u8g2.setCursor(5, 62);
+  u8g2.print("连接到网络...");
+  // u8g2.setFont(spleen6x12PL);
+  // u8g2.drawStr(5, 62, "Connecting to network...    ");
   
   
   u8g2.sendBuffer();
@@ -5815,10 +5024,13 @@ void setup()
     //u8g2.setFont(u8g2_font_fub14_tf);
     //u8g2.drawStr(5, 32, "WiFi Connected");
     currentIP = WiFi.localIP().toString();  //konwersja IP na string
-    u8g2.setFont(spleen6x12PL);
+    u8g2.setFont(u8g2_font_spleen6x12_mr);
     u8g2.drawStr(5, 62, "                               ");  // czyszczenie lini spacjami
     u8g2.sendBuffer();
-    u8g2.drawStr(5, 62, "Connected, IP:");  //wyswietlenie IP
+    u8g2.setFont(u8g2_font_wqy12_t_gb2312);
+    u8g2.setCursor(5, 62);
+    u8g2.print("已连接, IP:");  //wyswietlenie
+    // u8g2.drawStr(5, 62, "Connected, IP:");  //wyswietlenie IP
     u8g2.drawStr(90, 62, currentIP.c_str());   //wyswietlenie IP
     u8g2.sendBuffer();
     delay(1000);  // odczekaj 1 sek przed wymazaniem numeru IP
@@ -5970,7 +5182,7 @@ void setup()
       fwupd = true;
       u8g2.setDrawColor(1);
       u8g2.clearBuffer();
-      u8g2.setFont(spleen6x12PL);     
+      u8g2.setFont(u8g2_font_spleen6x12_mr);
       u8g2.setCursor(5, 12); u8g2.print("Evo Radio, OTA Firwmare Update");
       u8g2.sendBuffer();
 
@@ -6535,7 +5747,7 @@ void setup()
       }  
     });
 
-server.on("/info", HTTP_GET, [](AsyncWebServerRequest *request) 
+    server.on("/info", HTTP_GET, [](AsyncWebServerRequest *request) 
     {
       String html = String(info_html);
   
@@ -6569,11 +5781,20 @@ server.on("/info", HTTP_GET, [](AsyncWebServerRequest *request)
   {
     Serial.println("Brak połączenia z siecią WiFi");  // W przypadku braku polaczenia wifi - wyslij komunikat na serial
     u8g2.clearBuffer();
-    u8g2.setFont(spleen6x12PL);
-    u8g2.drawStr(5, 13, "No network connection");  // W przypadku braku polaczenia wifi - wyswietl komunikat na wyswietlaczu OLED
-    u8g2.drawStr(5, 26, "Connect to WiFi: ESP Internet Radio");
-    u8g2.drawStr(5, 39, "Open web page http://192.168.4.1");
+    // u8g2.setFont(u8g2_font_spleen6x12_mr);
+    u8g2.setFont(u8g2_font_wqy12_t_chinese1);
+    u8g2.setCursor(5, 13);
+    u8g2.print("没有网络连接"); 
+    u8g2.setCursor(5, 26);
+    u8g2.print("连接到WiFi: ESP Internet Radio");
+    u8g2.setCursor(5, 39);
+    u8g2.print("打开网页 http://192.168.4.1");
     u8g2.sendBuffer();
+
+    // u8g2.drawStr(5, 13, "No network connection"); // W przypadku braku polaczenia wifi - wyswietl komunikat na wyswietlaczu OLED
+    // u8g2.drawStr(5, 26, "Connect to WiFi: ESP Internet Radio");
+    // u8g2.drawStr(5, 39, "Open web page http://192.168.4.1");
+    // u8g2.sendBuffer();
     while(true)
     { wifiManager.process(); } // Nieskonczona petla z procesowaniem Wifi aby nie przejsc do ekranu radia gdy nie ma Wifi
   }
@@ -6965,7 +6186,7 @@ void loop()
           u8g2.drawLine(204,59,201,55); // lewe ramie
           u8g2.drawLine(204,59,207,55); // prawe ramie
 
-          u8g2.setFont(spleen6x12PL);
+          u8g2.setFont(u8g2_font_spleen6x12_mr);
           drawSignalPower(210,63,0,0); // x, y, 0-bez wydruku mocy sygnału na terminalu , 1-z wydrukiem, mode 
 
         } 
